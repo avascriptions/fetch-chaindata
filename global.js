@@ -42,12 +42,6 @@ const connectMongo = async () => {
 
 const sleep = (ms) => new Promise(f => setTimeout(f, ms));
 
-const lastBlockCache = {
-    lock: false,
-    time: 0,
-    height: 0,
-}
-
 async function getLastBlockNumber() {
     const data = {
         jsonrpc: '2.0',

@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { config, sleep, Transaction, Evmlog, getLastBlockNumber, getBlockByNumber, getEvmLogs } from './global.js';
 
 const inputPrefix = '0x646174613a';
@@ -35,6 +36,7 @@ export async function fetchData() {
                 console.log('start with the latest block in the database', fetchBlockNumber);
             }
         }
+
         fetchBlockNumber++;
         if (fetchBlockNumber > lastBlockNumber) {
             lastBlockNumber = await getLastBlockNumber();
@@ -100,14 +102,24 @@ export async function fetchData() {
         });
         
         // save to db
-        if (result.transactions.length > 0) {
-            await Transaction.insertMany(result.transactions);
-        }
-        if (result.evmLogs.length > 0) {
-            for (const evmLog of result.evmLogs) {
-                evmLog.timestamp = result.timestamp;
+        try {
+            const session = await mongoose.startSession();
+            session.startTransaction();
+            if (result.transactions.length > 0) {
+                await Transaction.insertMany(result.transactions, { session });
             }
-            await Evmlog.insertMany(result.evmLogs);
+            if (result.evmLogs.length > 0) {
+                for (const evmLog of result.evmLogs) {
+                    evmLog.timestamp = result.timestamp;
+                }
+                await Evmlog.insertMany(result.evmLogs, { session });
+            }
+            await session.commitTransaction();
+            await session.endSession();
+        } catch (e) {
+            await session.abortTransaction();
+            await session.endSession();
+            throw e;
         }
 
         console.log('fetch completed,', result.transactions.length, 'trxs,', result.evmLogs.length, 'logs, cost time:', Date.now() - start,  'ms');
