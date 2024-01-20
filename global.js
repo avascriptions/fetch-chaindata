@@ -58,6 +58,7 @@ async function getLastBlockNumber() {
     const response = await axios.request(arc);
     if (response.status === 200) {
         if (response.data && typeof response.data.result == 'string') {
+            // reduced by two blocks to prevent rollback
             return parseInt(response.data.result, 16) - 2;
         }
         throw new Error('empty result');

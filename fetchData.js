@@ -126,7 +126,6 @@ export async function fetchData() {
 
     } catch (error) {
         fetchBlockNumber--;
-        console.log(error);
         console.error('fetch error', error.message);
         await sleep(2000);
     } finally {
