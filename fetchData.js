@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { config, sleep, Transaction, Evmlog, getLastBlockNumber, getBlockByNumber, getEvmLogs } from './global.js';
+import { config, sleep, Transaction, Evmlog, Status, getLastBlockNumber, getBlockByNumber, getEvmLogs, getStatusId } from './global.js';
 
 const inputPrefix = '0x646174613a';
 const topicTransfer = '0x8cdf9e10a7b20e7a9c4e778fc3eb28f2766e438a9856a62eac39fbd2be98cbc2';
@@ -8,8 +8,14 @@ const topicExchange = '0xe2750d6418e3719830794d3db788aa72febcd657bcd18ed8f1facdb
 let fetchBlockNumber = 0;
 let lastBlockNumber = 0;
 
+let statusId = '';
+
 export async function fetchData() {
     const start = Date.now();
+
+    if (statusId == '') {
+        statusId = await getStatusId();
+    }
 
     // get last block number
     if (lastBlockNumber == 0) {
@@ -18,17 +24,9 @@ export async function fetchData() {
 
     try {
         if (fetchBlockNumber == 0) {
-            const lastTrx = await Transaction.findOne({}, null, { sort: { _id: -1 }});
-            if (lastTrx) {
-                fetchBlockNumber = parseInt(lastTrx.block);
-            }
-            const lastLog = await Evmlog.findOne({}, null, { sort: { _id: -1 }});
-            if (lastLog) {
-                const blockNumber = parseInt(lastLog.block);
-                if (blockNumber > fetchBlockNumber) {
-                    fetchBlockNumber = blockNumber;
-                }
-            } 
+            const statusRow = await Status.findOne({});
+            fetchBlockNumber = statusRow.block;
+
             if (fetchBlockNumber == 0) {
                 fetchBlockNumber = parseInt(config.FROM_LOG_BLOCK || '0');
                 console.log('no records found in the databse, start from', fetchBlockNumber);
@@ -102,8 +100,9 @@ export async function fetchData() {
         });
         
         // save to db
+        let session = null;
         try {
-            const session = await mongoose.startSession();
+            session = await mongoose.startSession();
             session.startTransaction();
             if (result.transactions.length > 0) {
                 await Transaction.insertMany(result.transactions, { session });
@@ -114,11 +113,16 @@ export async function fetchData() {
                 }
                 await Evmlog.insertMany(result.evmLogs, { session });
             }
+            await Status.updateOne({_id: statusId}, {block: fetchBlockNumber}, { session });
+            
             await session.commitTransaction();
             await session.endSession();
         } catch (e) {
-            await session.abortTransaction();
-            await session.endSession();
+            console.log(e);
+            if (session) {
+                await session.abortTransaction();
+                await session.endSession();
+            }
             throw e;
         }
 

@@ -15,7 +15,10 @@ const TransactionSchema = new Schema({
     },
     from:      String,
     to:        String,
-    block:     Number,
+    block:     {
+        type: Number,
+        index: true,
+    },
     idx:       Number,
     timestamp: Number,
     input:     String
@@ -26,14 +29,22 @@ const EvmlogSchema = new Schema({
     address:   String,
     topics:    [String],
     data:      String,
-    block:     Number,
+    block:     {
+        type: Number,
+        index: true,
+    },
     trxIndex:  Number,
     logIndex:  Number,
     timestamp: Number
 });
 
+const StatusSchema = new Schema({
+    block:     Number,
+});
+
 const Transaction = model('transaction', TransactionSchema, 'transactions');
 const Evmlog = model('evmlog', EvmlogSchema, 'evmlogs');
+const Status = model('status', StatusSchema, 'status');
 
 const connectMongo = async () => {
     // connect to database
@@ -65,7 +76,6 @@ async function getLastBlockNumber() {
     } else {
         throw new Error('getLastBlockNumber error');
     }
-
 }
 
 async function getBlockByNumber(blockNumber) {
@@ -122,13 +132,37 @@ async function getEvmLogs(fromBlock, toBlock) {
     }
 }
 
+async function getStatusId() {
+    let statusRow = await Status.findOne({});
+    if (!statusRow) {
+        let lastBlock = 0;
+        const lastTrx = await Transaction.findOne({}, null, { sort: { _id: -1 }});
+        if (lastTrx) {
+            lastBlock = parseInt(lastTrx.block);
+        }
+        const lastLog = await Evmlog.findOne({}, null, { sort: { _id: -1 }});
+        if (lastLog) {
+            const blockNumber = parseInt(lastLog.block);
+            if (blockNumber > lastBlock) {
+                lastBlock = blockNumber;
+            }
+        } 
+        statusRow = await Status.create([ { block: lastBlock } ]);
+        
+    }
+    console.log('statusId', statusRow._id, 'lastBlock', statusRow.block );
+    return statusRow._id;
+}
+
 export {
     config,
     connectMongo,
     sleep,
     Transaction,
     Evmlog,
+    Status,
     getLastBlockNumber,
     getBlockByNumber,
     getEvmLogs,
+    getStatusId,
 }
