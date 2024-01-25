@@ -147,8 +147,11 @@ async function getStatusId() {
                 lastBlock = blockNumber;
             }
         } 
-        statusRow = await Status.create([ { block: lastBlock } ]);
-        
+        const result = await Status.create([ { block: lastBlock } ]);
+        if (!result || !result.length) {
+            throw new Error('insert block error');
+        }
+        statusRow = result[0];
     }
     console.log('statusId', statusRow._id, 'lastBlock', statusRow.block );
     return statusRow._id;
