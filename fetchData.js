@@ -114,11 +114,11 @@ export async function fetchData() {
                 await Evmlog.insertMany(result.evmLogs, { session });
             }
             await Status.updateOne({_id: statusId}, {block: fetchBlockNumber}, { session });
-            
+
             await session.commitTransaction();
             await session.endSession();
         } catch (e) {
-            console.log(e);
+            // console.log(e);
             if (session) {
                 await session.abortTransaction();
                 await session.endSession();
